@@ -142,6 +142,67 @@ uvicorn main:app --reload
 
 Parameters can be combined. If none are provided, all contacts are returned.
 
+## Known Issues & Fixes
+
+### 1. `ValueError` on February 29 birthday in a non-leap year
+
+**Problem:** `contact.birthday.replace(year=today.year)` raises `ValueError` for contacts born on Feb 29 when the current year is not a leap year. This caused `GET /contacts/birthdays` to return HTTP 500.
+
+**Fix:** Extracted a `_next_birthday()` helper in `app/crud.py` that wraps the `.replace()` call in a `try/except ValueError` and falls back to March 1 — the conventional next-day representation used in most HR and calendar systems.
+
+```python
+def _next_birthday(birthday: date, today: date) -> date:
+    try:
+        candidate = birthday.replace(year=today.year)
+    except ValueError:
+        candidate = date(today.year, 3, 1)  # Feb 29 → Mar 1 in non-leap years
+    ...
+```
+
+---
+
+### 2. Duplicate email returns HTTP 500 instead of 409
+
+**Problem:** The `email` column has a `UNIQUE` constraint in the database. Inserting or updating a contact with an already-existing email raised an unhandled `sqlalchemy.exc.IntegrityError`, which FastAPI surfaced as a generic 500 Internal Server Error.
+
+**Fix:** Both `create_contact` and `update_contact` in `app/crud.py` now wrap `db.commit()` in a `try/except IntegrityError` and re-raise. The router catches it and returns a proper `409 Conflict` response.
+
+```python
+# crud.py
+try:
+    db.commit()
+except IntegrityError:
+    db.rollback()
+    raise
+
+# routers/contacts.py
+except IntegrityError:
+    raise HTTPException(status_code=409, detail="Email already exists")
+```
+
+---
+
+### 3. Multi-parameter search used OR instead of AND
+
+**Problem:** The initial implementation combined multiple query parameters with `or_()`, so `?first_name=Ivan&email=test@example.com` returned contacts matching **either** condition — counter-intuitive for a search filter.
+
+**Fix:** Replaced the collected `or_(*filters)` call with sequential `.filter()` chaining, so each provided parameter narrows the result set (AND semantics).
+
+```python
+# Before
+query = query.filter(or_(*filters))
+
+# After
+if first_name:
+    query = query.filter(Contact.first_name.ilike(f"%{first_name}%"))
+if last_name:
+    query = query.filter(Contact.last_name.ilike(f"%{last_name}%"))
+if email:
+    query = query.filter(Contact.email.ilike(f"%{email}%"))
+```
+
+---
+
 ## Usage Examples
 
 **Create a contact**
