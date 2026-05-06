@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app import crud
 from app.database import get_db
 from app.schemas import ContactCreate, ContactUpdate, ContactResponse
@@ -10,7 +11,10 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 @router.post("/", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 def create_contact(data: ContactCreate, db: Session = Depends(get_db)):
-    return crud.create_contact(db, data)
+    try:
+        return crud.create_contact(db, data)
+    except IntegrityError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
 
 @router.get("/birthdays", response_model=list[ContactResponse])
@@ -38,7 +42,10 @@ def get_contact(contact_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{contact_id}", response_model=ContactResponse)
 def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(get_db)):
-    contact = crud.update_contact(db, contact_id, data)
+    try:
+        contact = crud.update_contact(db, contact_id, data)
+    except IntegrityError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
     if not contact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
     return contact
