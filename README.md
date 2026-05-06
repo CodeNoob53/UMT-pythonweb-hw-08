@@ -1,48 +1,74 @@
 # Contacts REST API
 
-REST API for storing and managing contacts, built with **FastAPI** and **SQLAlchemy**.  
-Supports full CRUD, search by query parameters, and upcoming birthday lookup.
+![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?logo=sqlalchemy&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?logo=pydantic&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+## About
+
+Homework 8 for the UMT Full-Stack Python Web Development course.
+
+**Goal:** build a production-ready REST API for storing and managing personal contacts.  
+The API is built with **FastAPI**, uses **SQLAlchemy ORM** for all database interactions, and **PostgreSQL** as the primary database. Data validation is handled by **Pydantic v2** schemas. The full OpenAPI (Swagger) documentation is generated automatically.
+
+## What Was Done
+
+- Designed a `Contact` database model with all required fields: first name, last name, email, phone, birthday, and optional extra notes
+- Implemented full CRUD via REST endpoints (create, read, update, delete)
+- Added contact search by `first_name`, `last_name`, or `email` via query parameters (case-insensitive, partial match)
+- Added a dedicated endpoint that returns contacts whose birthday falls within the next 7 days
+- Configured Pydantic schemas with proper type validation — `birthday` is stored and validated as a `date`, not a plain string
+- Documented all endpoints via auto-generated Swagger UI at `/docs`
 
 ## Tech Stack
 
-- **Python 3.12+**
-- **FastAPI** — web framework with automatic OpenAPI docs
-- **SQLAlchemy 2.0** — ORM for database interaction
-- **PostgreSQL** — primary database
-- **Pydantic v2** — request/response validation
-- **Alembic** — database migrations
-- **Uvicorn** — ASGI server
+| Layer | Technology |
+|-------|-----------|
+| Framework | FastAPI |
+| ORM | SQLAlchemy 2.0 |
+| Database | PostgreSQL |
+| Validation | Pydantic v2 |
+| Server | Uvicorn |
+| Config | pydantic-settings + python-dotenv |
 
 ## Project Structure
 
 ```
-├── main.py               # App entry point, table creation
+├── main.py               # App entry point; creates DB tables on startup
 ├── requirements.txt
-├── docker-compose.yml    # PostgreSQL via Docker
-├── .env.example
+├── docker-compose.yml    # PostgreSQL service
+├── .env.example          # Environment variable template
 └── app/
-    ├── config.py         # Settings via pydantic-settings
-    ├── database.py       # Engine, session, Base
+    ├── config.py         # Settings loaded from .env
+    ├── database.py       # SQLAlchemy engine, session factory, Base
     ├── models.py         # Contact ORM model
-    ├── schemas.py        # Pydantic schemas (Create / Update / Response)
-    ├── crud.py           # Database operations
+    ├── schemas.py        # Pydantic schemas: ContactCreate / ContactUpdate / ContactResponse
+    ├── crud.py           # All database operations (no raw SQL)
     └── routers/
-        └── contacts.py   # API endpoints
+        └── contacts.py   # REST endpoints
 ```
 
 ## Setup
 
-**1. Clone and install dependencies**
+**1. Clone the repository**
 
 ```bash
-git clone https://github.com/your-username/UMT-pythonweb-hw-08.git
+git clone https://github.com/CodeNoob53/UMT-pythonweb-hw-08.git
 cd UMT-pythonweb-hw-08
+```
+
+**2. Create a virtual environment and install dependencies**
+
+```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**2. Configure environment**
+**3. Configure environment**
 
 ```bash
 cp .env.example .env
@@ -54,55 +80,46 @@ Edit `.env`:
 DATABASE_URL=postgresql://postgres:password@localhost:5432/contacts_db
 ```
 
-**3. Start PostgreSQL**
+**4. Start PostgreSQL**
+
+With Docker:
 
 ```bash
 docker compose up -d
 ```
 
-Or use a local PostgreSQL instance and create the database manually:
+Or create the database manually on an existing PostgreSQL instance:
 
 ```bash
 psql -U postgres -c "CREATE DATABASE contacts_db;"
 ```
 
-**4. Run the server**
+**5. Run the server**
 
 ```bash
 uvicorn main:app --reload
 ```
 
-The app will be available at `http://localhost:8000`.  
-Interactive API docs: `http://localhost:8000/docs`
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8000` | API root |
+| `http://localhost:8000/docs` | Swagger UI |
+| `http://localhost:8000/redoc` | ReDoc |
 
-## API Endpoints
+## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
 | `POST` | `/contacts/` | Create a new contact |
-| `GET` | `/contacts/` | List all contacts (supports search) |
-| `GET` | `/contacts/{id}` | Get contact by ID |
-| `PUT` | `/contacts/{id}` | Update contact |
-| `DELETE` | `/contacts/{id}` | Delete contact |
+| `GET` | `/contacts/` | List all contacts (with optional search) |
 | `GET` | `/contacts/birthdays` | Contacts with birthdays in the next 7 days |
+| `GET` | `/contacts/{id}` | Get contact by ID |
+| `PUT` | `/contacts/{id}` | Update existing contact |
+| `DELETE` | `/contacts/{id}` | Delete contact |
 
-## Search
-
-The `GET /contacts/` endpoint supports optional query parameters for filtering:
-
-| Parameter | Description |
-|-----------|-------------|
-| `first_name` | Filter by first name (case-insensitive, partial match) |
-| `last_name` | Filter by last name (case-insensitive, partial match) |
-| `email` | Filter by email (case-insensitive, partial match) |
-
-**Example:**
-
-```
-GET /contacts/?first_name=ivan&email=example.com
-```
-
-## Contact Model
+### Contact Schema
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -110,10 +127,22 @@ GET /contacts/?first_name=ivan&email=example.com
 | `last_name` | `string` | Yes | Last name |
 | `email` | `string` | Yes | Email address (unique) |
 | `phone` | `string` | Yes | Phone number |
-| `birthday` | `date` | Yes | Date of birth (`YYYY-MM-DD`) |
+| `birthday` | `date` | Yes | Date of birth — `YYYY-MM-DD` |
 | `extra` | `string` | No | Additional notes |
 
-## Example Requests
+### Search Parameters
+
+`GET /contacts/` accepts the following optional query parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `first_name` | Partial, case-insensitive match on first name |
+| `last_name` | Partial, case-insensitive match on last name |
+| `email` | Partial, case-insensitive match on email |
+
+Parameters can be combined. If none are provided, all contacts are returned.
+
+## Usage Examples
 
 **Create a contact**
 
@@ -130,19 +159,20 @@ curl -X POST http://localhost:8000/contacts/ \
   }'
 ```
 
-**Search by last name**
+**Search contacts**
 
 ```bash
 curl "http://localhost:8000/contacts/?last_name=petrenko"
+curl "http://localhost:8000/contacts/?email=example.com"
 ```
 
-**Get upcoming birthdays**
+**Get contacts with upcoming birthdays**
 
 ```bash
 curl http://localhost:8000/contacts/birthdays
 ```
 
-**Update phone number**
+**Update a contact**
 
 ```bash
 curl -X PUT http://localhost:8000/contacts/1 \
